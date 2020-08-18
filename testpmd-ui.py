@@ -1,14 +1,14 @@
 #!/usr/bin/python3
 
 from scapy.all import *
-from flexx import flx, app
+from flexx import flx, app, ui
 
 class DeviceBox(flx.PyWidget):
 
 	def init(self):
 		self.box=[]
 		with flx.VBox():
-			flx.Label(text='-------- Device List --------', )
+			flx.Label(text='-------- Device List --------', flex=1, css_class="center")
 			for i, dev in enumerate(self.root.interface_list):
 				txt=" PCI_ID: " + self.root.pci_list[i] + " mac: " + self.root.mac_list[i].upper() + "Interface: " + dev 
 				self.box.append(flx.CheckBox(text=txt))
@@ -26,19 +26,66 @@ class EALBox(flx.PyWidget):
 	def init(self):
 		self.box=[]
 		with flx.VBox():
-			flx.Label(text='-------- Device List --------', )
-			for i, dev in enumerate(self.root.interface_list):
-				txt=" PCI_ID: " + self.root.pci_list[i] + " mac: " + self.root.mac_list[i].upper() + "Interface: " + dev 
-				self.box.append(flx.CheckBox(text=txt))
+			flx.Label(text='-------- EAL  args --------', flex=1, css_class="center")
+			with flx.HBox():
+				ui.Label(text='--master-core:', flex=3)
+				self.mc = ui.LineEdit(text='0', flex=2)
+				ui.Label(text='-c COREMASK:', flex=3)
+				self.cm = ui.LineEdit(text='0xffff', flex=2)
 
-	@flx.reaction
-	def a_button_was_pressed(self):
-		self.root.dev_arg.clear()
-		for j, checkbox in enumerate(self.box):
-			if checkbox.checked:
-				self.root.dev_arg.append(self.root.pci_list[j])
-				print(self.root.pci_list[j])
+	def get_eal_arg(self):
+		eal_arg = "--master-core="+self.mc.text + " -c " + self.cm.text
+		return eal_arg
 
+class APPBox(flx.PyWidget):
+
+	def init(self):
+		self.box=[]
+		with flx.VBox():
+			flx.Label(text='-------- Testpmd args --------', flex=1, css_class="center")
+			with flx.HBox():
+				self.cb_as = flx.CheckBox(text="Auto-start")
+				self.cb_crc = flx.CheckBox(text="disable-crc-strip")
+				self.cb_fia = flx.CheckBox(text="flow-isolate-all")
+			with flx.HBox():
+				ui.Label(text='--rxq:')
+				self.rxq = ui.LineEdit(text='1')
+				ui.Label(text='--rxd:')
+				self.rxd = ui.LineEdit(text='64')
+				ui.Label(text='--txq:')
+				self.txq = ui.LineEdit(text='1')
+				ui.Label(text='--txd:')
+				self.txd = ui.LineEdit(text='64')
+				ui.Label(text='--hairpin:')
+				self.hairpin = ui.LineEdit(text='1')
+
+
+	def get_testpmd_arg(self):
+		testpmd_arg = "--rxq="+self.rxq.text + " --txq=" + self.txq.text
+		return testpmd_arg
+
+class FlowBox(flx.PyWidget):
+
+	def init(self):
+		self.box=[]
+		with flx.VBox():
+			flx.Label(text='-------- Add flow --------', flex=1, css_class="center")
+			with flx.HBox():
+				ui.Label(text='attr:')
+				ui.Label(text='port_id:')
+				self.port_id = ui.LineEdit(text='0')
+				ui.Label(text='group:')
+				self.port_id = ui.LineEdit(text='1')
+				self.attr = ui.ComboBox(editable=True, selected_key='ingress', options=('ingress', 'egress', 'transfer'))
+			with flx.HBox():
+				ui.Label(text='pattern:')
+				self.eth = flx.CheckBox(text="eth")
+				self.eth_v = ui.LineEdit(text='1', editable=False)
+
+
+	def get_testpmd_arg(self):
+		testpmd_arg = "--rxq="+self.rxq.text + " --txq=" + self.txq.text
+		return testpmd_arg
 
 class TestpmdUI(flx.PyWidget):
 
@@ -62,6 +109,9 @@ class TestpmdUI(flx.PyWidget):
 		self.get_dev_info()
 		with flx.VBox(flex=1):
 			self.db=DeviceBox()
+			self.eb=EALBox()
+			self.ab=APPBox()
+			self.fb=FlowBox()
 
               
 if __name__ == '__main__':

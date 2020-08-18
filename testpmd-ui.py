@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from scapy.all import *
-from flexx import flx, app, ui
+from flexx import flx, app, ui, event
 
 class DeviceBox(flx.PyWidget):
 
@@ -64,6 +64,91 @@ class APPBox(flx.PyWidget):
 		testpmd_arg = "--rxq="+self.rxq.text + " --txq=" + self.txq.text
 		return testpmd_arg
 
+class ItemBox(flx.PyWidget):
+
+	def init(self):
+		self.pattern = "pattern "
+		with flx.VBox():
+			with flx.HBox():
+				ui.Label(text='pattern:')
+				self.item = ui.ComboBox(editable=True, selected_key='eth', options=('eth', 'ipv4', 'ipv6', 'tcp', 'udp', 'vlan', 'vxlan', 'tag'))
+				self.al = ui.Label(text='src:')
+				self.av = ui.LineEdit(text='1')
+				self.am = ui.Label(text='src_mask:')
+				self.amv = ui.LineEdit(text='1')
+				self.bl = ui.Label(text='dst:')
+				self.bv = ui.LineEdit(text='1')
+				self.bm = ui.Label(text='dst_mask:')
+				self.bmv = ui.LineEdit(text='1')
+				self.add = flx.Button(text='add')
+				self.cl = flx.Button(text='clear')
+			with flx.HBox():
+				self.showitem = ui.Label(text="No pattern")
+
+	def get_item(self):
+		return self.pattern + " end"
+
+	@flx.reaction('add.pointer_click')
+	def add_widget(self, *events):
+		self.pattern = self.pattern + self.item.selected_key + "/"
+		ttext = self.pattern + "end"
+		self.showitem.set_text(ttext)
+
+	@flx.reaction('cl.pointer_click')
+	def cl_widget(self, *events):
+		self.pattern = "pattern "
+		self.showitem.set_text("No pattern")
+
+	@event.reaction
+	def combo_key_change(self):
+		if self.item.selected_index < 3:
+			self.al.set_text("src:")
+			self.av.set_text('1')
+			self.am.set_text("src_mask:")
+			self.amv.set_text('1')
+			self.bl.set_text("dst:")
+			self.bv.set_text('1')
+			self.bm.set_text("dst_mask:")
+			self.bmv.set_text('1')
+		elif self.item.selected_index < 5:
+			self.al.set_text("src_port:")
+			self.av.set_text('1')
+			self.am.set_text("dst_port:")
+			self.amv.set_text('1')
+			self.bl.set_text("")
+			self.bv.set_text('')
+			self.bm.set_text("")
+			self.bmv.set_text('')
+		elif self.item.selected_index is 5:
+			self.al.set_text("vlan_id")
+			self.av.set_text('56')
+			self.am.set_text("")
+			self.amv.set_text('')
+			self.bl.set_text("")
+			self.bv.set_text('')
+			self.bm.set_text("")
+			self.bmv.set_text('')
+		elif self.item.selected_index is 6:
+			self.al.set_text("vxlan_id")
+			self.av.set_text('56')
+			self.am.set_text("")
+			self.amv.set_text('')
+			self.bl.set_text("")
+			self.bv.set_text('')
+			self.bm.set_text("")
+			self.bmv.set_text('')
+		elif self.item.selected_index is 7:
+			self.al.set_text("tg_id")
+			self.av.set_text('56')
+			self.am.set_text("")
+			self.amv.set_text('')
+			self.bl.set_text("")
+			self.bv.set_text('')
+			self.bm.set_text("")
+			self.bmv.set_text('')
+
+
+
 class FlowBox(flx.PyWidget):
 
 	def init(self):
@@ -77,11 +162,7 @@ class FlowBox(flx.PyWidget):
 				ui.Label(text='group:')
 				self.port_id = ui.LineEdit(text='1')
 				self.attr = ui.ComboBox(editable=True, selected_key='ingress', options=('ingress', 'egress', 'transfer'))
-			with flx.HBox():
-				ui.Label(text='pattern:')
-				self.eth = flx.CheckBox(text="eth")
-				self.eth_v = ui.LineEdit(text='1', editable=False)
-
+			self.item = ItemBox()
 
 	def get_testpmd_arg(self):
 		testpmd_arg = "--rxq="+self.rxq.text + " --txq=" + self.txq.text

@@ -2,6 +2,9 @@
 
 from scapy.all import *
 from flexx import flx, app, ui, event
+import shlex, subprocess
+import threading
+import time
 
 
 class DeviceBox(flx.PyWidget):
@@ -48,6 +51,8 @@ class EALBox(flx.PyWidget):
 		eal_arg = "--master-lcore="+self.mc.text + " -c " + self.cm.text
 		return eal_arg
 
+
+
 class APPBox(flx.PyWidget):
 
 	def init(self):
@@ -89,6 +94,7 @@ class APPBox(flx.PyWidget):
 			testpmd_arg += " -a "
 		return testpmd_arg
 
+
 	@flx.reaction('start.pointer_click')
 	def add_widget(self, *events):
 		if len(self.root.dev_arg) == 0:
@@ -99,8 +105,6 @@ class APPBox(flx.PyWidget):
 			dev_list += " -w " + ''.join(pcid) + " "
 		testpmd_cmdline = "/root/test/dpdk.org/x86_64-native-linuxapp-gcc/app/testpmd " + self.root.eb.get_eal_arg() + dev_list + " -- " +self.get_testpmd_arg() + " -i"
 		self.cmdline.set_text(testpmd_cmdline)
-		
-
 
 class ItemBox(flx.PyWidget):
 
@@ -139,10 +143,10 @@ class ItemBox(flx.PyWidget):
 			if self.bmv.text != '0':
 				ttext += " dst mask " + self.bmv.text
 		elif self.item.selected_index < 5:
-			if self.av.text != '0':
+			if self.av.text != '-1':
 				ttext += " src is " + self.av.text
-			if self.bv.text != '0':
-				ttext += " dst is " + self.bv.text
+			if self.amv.text != '-1':
+				ttext += " dst is " + self.amv.text
 		elif self.item.selected_index is 5:
 			if self.av.text != '0':
 				ttext += " vid is " + self.av.text
@@ -335,7 +339,7 @@ class ShowBox(flx.PyWidget):
 	def init(self):
 		self.box=[]
 		with flx.VBox(flex=1, style='border:2px solid gray;border-radius: 5px'):
-			flx.Label(text='Show', flex=1, style='text-align:center')
+			self.outlog = flx.Label(text='Interactive(TBD)', flex=1, style='text-align:center')
 
 
 class FocusBox(flx.VBox):

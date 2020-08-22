@@ -5,7 +5,86 @@ from flexx import flx, app, ui, event
 import shlex, subprocess
 import threading
 import time
+import pexpect, asyncio
 
+class TestPMD(flx.Component):
+	def init(self):
+		self.logfile = io.StringIO()
+		self.shell = None
+		self.sent_lines = 0
+		self.total_lines = 0
+		self.alive = False
+		self.refresh()
+
+	def prompt(self):
+		idx = self.shell.expect(['testpmd>', pexpect.EOF, pexpect.TIMEOUT])
+		if idx:
+			self.alive = False
+			self.shell.close()
+			return
+		while self.alive and self.shell.buffer and self.shell.buffer.strip():
+			idx = self.shell.expect(['testpmd>', pexpect.EOF, pexpect.TIMEOUT])
+			if idx:
+				self.alive = False
+				self.shell.close()
+				return
+		self.alive = True
+
+	def start(self, cmd):
+		if not self.alive:
+			self.shell = pexpect.spawn(cmd, echo=False, encoding='utf-8')
+			self.shell.logfile = self.logfile
+			self.prompt()
+
+	def input(self, data):
+		self.shell.sendline(data)
+		self.prompt()
+
+	def output(self):
+		if self.shell:
+			lines = self.logfile.getvalue().splitlines()
+			self.total_lines = len(lines)
+		if self.sent_lines < self.total_lines:
+			self.emit('output', dict(buffer=lines[self.sent_lines:]))
+			self.sent_lines = self.total_lines
+
+	def refresh(self):
+		self.output()
+		asyncio.get_event_loop().call_later(1, self.refresh)
+
+testpmd = TestPMD()
+
+class TestPMDOut(flx.Label):
+
+    CSS = """
+    .flx-TestPMDOut {
+        overflow-y:scroll;
+        background: black;
+		color: lightgreen;
+        border: 1px solid #444;
+        margin: 3px;
+		font-family: Consolas, Courier, monospace;
+		font-size: 0.875em;
+    }
+    """
+
+    def init(self):
+        super().init()
+        global window
+        self._se = window.document.createElement('div')
+
+    def sanitize(self, text):
+        self._se.textContent = text
+        text = self._se.innerHTML
+        self._se.textContent = ''
+        return text
+
+    @flx.action
+    def add_line(self, msg):
+        line = self.sanitize(msg)
+        self.set_html(self.html + line + '<br />')
+        div = RawJS('document.getElementsByClassName("flx-TestPMDOut")[0]')
+        div.scrollTop = div.scrollHeight
 
 class DeviceBox(flx.PyWidget):
 
@@ -103,8 +182,9 @@ class APPBox(flx.PyWidget):
 		dev_list = ""
 		for pcid in self.root.dev_arg:
 			dev_list += " -w " + ''.join(pcid) + " "
-		testpmd_cmdline = "/root/test/dpdk.org/x86_64-native-linuxapp-gcc/app/testpmd " + self.root.eb.get_eal_arg() + dev_list + " -- " +self.get_testpmd_arg() + " -i"
+		testpmd_cmdline = "sudo /root/test/dpdk.org/x86_64-native-linuxapp-gcc/app/testpmd " + self.root.eb.get_eal_arg() + dev_list + " -- " +self.get_testpmd_arg() + " -i"
 		self.cmdline.set_text(testpmd_cmdline)
+		testpmd.start(testpmd_cmdline)
 
 class ItemBox(flx.PyWidget):
 
@@ -312,6 +392,7 @@ class ActionBox(flx.PyWidget):
 		self.action += " end"
 		flow_cmd = self.root.fb.get_attr_arg() + self.root.fb.item.get_item() + self.action
 		self.flow_detail.set_text(flow_cmd)
+		testpmd.input(flow_cmd)
 
 
 class FlowBox(flx.PyWidget):
@@ -339,7 +420,18 @@ class ShowBox(flx.PyWidget):
 	def init(self):
 		self.box=[]
 		with flx.VBox(flex=1, style='border:2px solid gray;border-radius: 5px'):
-			self.outlog = flx.Label(text='Interactive(TBD)', flex=1, style='text-align:center')
+			with flx.HBox(flex=0):
+				self.title = flx.Label(text='Interactive:', flex=0, style='text-align:left')
+				self.input = flx.LineEdit(placeholder_text='> input testpmd commands', flex=2)
+				disabled = False if testpmd.alive else True
+				self.input.set_disabled(disabled)
+			with flx.HBox(flex=1):
+				self.testpmdout=TestPMDOut(flex=1)
+
+	@event.reaction('input.submit')
+	def issue_cmd(self, *events):
+		testpmd.input(self.input.text + '\n')
+		self.input.set_text('')
 
 
 class FocusBox(flx.VBox):
@@ -383,6 +475,13 @@ class TestpmdUI(flx.PyWidget):
 				self.ab=APPBox(flex=0)
 				self.fb=FlowBox(flex=0)
 				self.show=ShowBox(flex=1)
+
+	@testpmd.reaction('!output')
+	def print_testpmd_output(self, *events):
+		self.show.input.set_disabled(not testpmd.alive)
+		for ev in events:
+			for line in ev.buffer:
+				self.show.testpmdout.add_line(line)
 
               
 if __name__ == '__main__':
